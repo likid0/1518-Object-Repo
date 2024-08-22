@@ -4,6 +4,13 @@ USER_HOME=$(cat /etc/passwd | grep ^U | cut -d: -f6)
 wget https://gist.githubusercontent.com/likid0/f034a5e8472b1ed38370463e8b06cc93/raw/9f49c677390493b2e8bdc4e768b563fcf13f2326/helperfile.adoc -O $USER_HOME/cli-helper-1518.adoc
 chmod 644 $USER_HOME/cli-helper-1518.adoc
 
+PROFILE_DIR=$(find $HOME/.mozilla/firefox -type d -name "*.default*" | head -n 1)
+
+if [ -z "$PROFILE_DIR" ]; then
+    echo "No Firefox profile found. Starting Firefox to create one..."
+    firefox & sleep 5 && pkill firefox
+fi
+
 # Search for the prefs.js file in the user's home directory
 PREFS_PATH=$(find $HOME -type f -name "prefs.js" | grep ".mozilla/firefox" | head -n 1)
 
