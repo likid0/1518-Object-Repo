@@ -4,7 +4,8 @@ USER_HOME=$(cat /etc/passwd | grep ^U | cut -d: -f6)
 USER=$(cat /etc/passwd | grep ^U | cut -d: -f1)
 cp ./cli-helper-1518.adoc $USER_HOME/cli-helper-1518.adoc
 cp ./cli-helper-1518.html $USER_HOME/cli-helper-1518.html
-chmod 644 $USER_HOME/cli-helper-1518.adoc
+chown $USER $USER_HOME/cli-helper-1518*
+chmod 644 $USER_HOME/cli-helper-1518*
 
 ## Configure html cli helper file as the default Firefox home page
 PROFILE_DIR=$(find $USER_HOME/.mozilla/firefox -type d -name "*.default*" | head -n 1)
@@ -22,6 +23,24 @@ PREFS_PATH=$(find $USER_HOME -type f -name "prefs.js" | grep ".mozilla/firefox" 
 if [ -z "$PREFS_PATH" ]; then
     echo "prefs.js file not found in the home directory."
     exit 1
+fi
+
+# Update profiles.ini to ensure the correct profile is used
+PROFILES_INI="$USER_HOME/.mozilla/firefox/profiles.ini"
+if [ -f "$PROFILES_INI" ]; then
+    echo "Updating profiles.ini to set the correct profile as default."
+    PROFILE_NAME=$(basename "$PROFILE_DIR")
+    cat <<EOF > "$PROFILES_INI"
+[General]
+StartWithLastProfile=1
+Version=2
+
+[Profile0]
+Name=default
+IsRelative=1
+Path=$PROFILE_NAME
+Default=1
+EOF
 fi
 
 ## Define the path to the local HTML file
