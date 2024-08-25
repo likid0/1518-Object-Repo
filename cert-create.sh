@@ -29,6 +29,7 @@ fi
 PROFILES_INI="$USER_HOME/.mozilla/firefox/profiles.ini"
 if [ -f "$PROFILES_INI" ]; then
     echo "Updating profiles.ini to set the correct profile as default."
+    PROFILE_DIR=$(find $USER_HOME/.mozilla/firefox -type d -name "*.default*" | head -n 1)
     PROFILE_NAME=$(basename "$PROFILE_DIR")
     cat <<EOF > "$PROFILES_INI"
 [General]
