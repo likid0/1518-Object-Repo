@@ -50,6 +50,9 @@ HTML_FILE_PATH="$USER_HOME/cli-helper-1518.html"
 ## Convert the file path to a URL format
 FILE_URL="file://$HTML_FILE_PATH"
 
+## Specify the second URL to open in a new tab
+SECOND_URL="https://ceph-node1:8443"
+
 ## Backup the current prefs.js file
 cp "$PREFS_PATH" "$PREFS_PATH.bak"
 
@@ -61,9 +64,40 @@ if [ ! -f "$USER_JS_PATH" ]; then
     chown $USER:$USER $USER_JS_PATH
 fi
 
-## Add the local file URL to the startup pages (home page) in user.js
-echo 'user_pref("browser.startup.homepage", "'$FILE_URL'");' >> "$USER_JS_PATH"
-echo "Firefox will open with $FILE_URL on startup."
+## Add the local file URL and the second URL to the startup pages (home pages) in user.js
+echo 'user_pref("browser.startup.homepage", "'$FILE_URL'|'$SECOND_URL'");' >> "$USER_JS_PATH"
+echo "Firefox will open with $FILE_URL and $SECOND_URL on startup."
+
+## SSL Certificate Section
+
+# Define the dashboard URL
+DASHBOARD_URL="ceph-node1:8443"
+
+echo "SSL certificate added to the trusted store. Configuration complete."
+
+# Extract the SSL certificate
+#CERT_DIR="$USER_HOME/.certs"
+#mkdir -p $CERT_DIR
+#CERT_FILE="$CERT_DIR/dashboard-cert.pem"
+#echo "Fetching SSL certificate from $DASHBOARD_URL..."
+#echo -n | openssl s_client -connect $DASHBOARD_URL -servername $DASHBOARD_URL | \
+#    sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > $CERT_FILE
+
+#echo "Adding SSL certificate to the trusted store..."
+#sudo cp $CERT_FILE /etc/pki/ca-trust/source/anchors/
+#sudo update-ca-trust
+
+# Import the certificate into Firefox's certificate store
+#CERT_DB_DIR="$PROFILE_DIR"
+#echo "Importing the SSL certificate into Firefox's certificate store..."
+#dnf install nss-tools -y
+#pkill firefox
+#certutil -D -n "Ceph Dashboard Certificate" -d sql:$CERT_DB_DIR
+#certutil -A -n "Ceph Dashboard Certificate" -t "C,," -i $CERT_FILE -d sql:$CERT_DB_DIR
+#echo "SSL certificate imported into Firefox's certificate store. Configuration complete."
+
+# Verify that the certificate has been added
+#certutil -L -d sql:$CERT_DB_DIR
 
 
 # Create Self-Signed Certs for LAB
@@ -106,6 +140,7 @@ DNS.2 = ceph-node3*
 DNS.3 = *.example.com
 DNS.4 = ceph-node4
 DNS.5 = ceph-node2
+DNS.6 = ceph-node1
 EOL
 if [ $? -ne 0 ]; then
   echo "Error creating v3.ext file."
@@ -163,5 +198,39 @@ fi
 
 echo "SSL certificate generation and configuration completed successfully."
 
-# Disable ssl check for the Dashboard for the Self-Signed
+# SCP the certificates to the remote Ceph node
+echo "Copying certificates to ceph-node1..."
+ssh ceph-node1 "mkdir /root/ssl-cert/"
+scp ceph-node3.crt ceph-node3.key rootCA.pem ceph-node1:/root/ssl-cert/
+
+# Use the generated certificates for the Ceph Dashboard
+echo "Setting up Ceph Dashboard to use the generated SSL certificate..."
+ssh ceph-node1 sudo ceph dashboard set-ssl-certificate -i /root/ssl-cert/ceph-node3.crt
+ssh ceph-node1 sudo ceph dashboard set-ssl-certificate-key -i /root/ssl-cert/ceph-node3.key
 ssh ceph-node1 sudo ceph dashboard set-rgw-api-ssl-verify False
+
+# Restart the Ceph MGR to apply the changes
+echo "Restarting Ceph Manager to apply the SSL certificate changes..."
+ssh ceph-node1 "podman restart \$(podman ps | grep mgr | awk '{print \$1}')"
+sleep 10
+
+# Define the paths to the certificate and CA
+CERT_DB_DIR="$PROFILE_DIR"
+CERT_FILE="$USER/ceph-node3.crt"
+ROOT_CA_FILE="$USER/rootCA.pem"
+
+# Import the new SSL certificate into Firefox's certificate store
+echo "Importing the SSL certificate into Firefox's certificate store..."
+sudo -u $USER certutil -D -n "Ceph Dashboard Certificate" -d sql:$CERT_DB_DIR
+sudo -u $USER certutil -A -n "Ceph Dashboard Certificate" -t "C,," -i $CERT_FILE -d sql:$CERT_DB_DIR
+
+# Import the Root CA into Firefox's certificate store
+echo "Importing the Root CA into Firefox's certificate store..."
+sudo -u $USER certutil -D -n "Ceph Dashboard Root CA" -d sql:$CERT_DB_DIR
+sudo -u $USER certutil -A -n "Ceph Dashboard Root CA" -t "C,," -i $ROOT_CA_FILE -d sql:$CERT_DB_DIR
+
+# Verify that the certificate and Root CA have been added
+sudo -u $USER certutil -L -d sql:$CERT_DB_DIR
+
+echo "Firefox certificate import complete."
+
