@@ -57,7 +57,7 @@ USER_JS_PATH=$(dirname "$PREFS_PATH")/user.js
 if [ ! -f "$USER_JS_PATH" ]; then
     touch "$USER_JS_PATH"
     chmod 644 $USER_JS_PATH
-    chown $USER $USER_JS_PATH
+    chown $USER:$USER $USER_JS_PATH
 fi
 
 ## Add the local file URL to the startup pages (home page) in user.js
