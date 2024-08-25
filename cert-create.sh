@@ -64,6 +64,7 @@ if [ ! -f "$USER_JS_PATH" ]; then
     chown $USER:$USER $USER_JS_PATH
 fi
 
+pkill firefox
 ## Add the local file URL and the second URL to the startup pages (home pages) in user.js
 echo 'user_pref("browser.startup.homepage", "'$FILE_URL'|'$SECOND_URL'");' >> "$USER_JS_PATH"
 echo "Firefox will open with $FILE_URL and $SECOND_URL on startup."
@@ -184,7 +185,10 @@ fi
 echo "Copying ceph-node3.pem and rootCA.pem to $USER_HOME with 644 permissions..."
 cp ceph-node3.pem $USER_HOME/
 cp rootCA.pem $USER_HOME/
+cp ceph-node3.crt /tmp
 chmod 644 $USER_HOME/rootCA.pem
+chmod 644 $USER_HOME/ceph-node3.pem
+chmod 644 /tmp/ceph-node3.crt
 if [ $? -ne 0 ]; then
   echo "Error copying ceph-node3.pem to $USER_HOME."
   exit 1
@@ -216,8 +220,9 @@ sleep 10
 
 # Define the paths to the certificate and CA
 CERT_DB_DIR="$PROFILE_DIR"
-CERT_FILE="$USER/ceph-node3.crt"
-ROOT_CA_FILE="$USER/rootCA.pem"
+CERT_FILE="/tmp/ceph-node3.crt"
+ROOT_CA_FILE="$USER_HOME/rootCA.pem"
+dnf install nss-tools -y
 
 # Import the new SSL certificate into Firefox's certificate store
 echo "Importing the SSL certificate into Firefox's certificate store..."
@@ -233,4 +238,3 @@ sudo -u $USER certutil -A -n "Ceph Dashboard Root CA" -t "C,," -i $ROOT_CA_FILE 
 sudo -u $USER certutil -L -d sql:$CERT_DB_DIR
 
 echo "Firefox certificate import complete."
-
